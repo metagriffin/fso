@@ -85,7 +85,8 @@ contributions will be merged and very much appreciated!
 Supported Operations
 ====================
 
-Currently, only the following methods are implemented:
+Currently, only the following I/O functions have replacements
+implemented:
 
 * builtin.open
 * os.path.exists
@@ -145,3 +146,4 @@ FSO supports context managers! Example:
         self.assertEqual(entry.content, 'created')
 
       self.assertFalse(os.path.exists('no-such-file'))
+
