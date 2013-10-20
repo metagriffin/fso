@@ -2,12 +2,6 @@
 File System Overlay
 ===================
 
-.. warning::
-
-  2013/10/19: FSO is currently under active development - come back in a
-  couple of weeks.
-
-
 File System Overlay (FSO) allows side-effect free unit testing of file
 I/O operations. It does this by creating an overlay over the local
 file system which allows read-through access, but stores write
