@@ -113,3 +113,35 @@ Known Limitations
 * File permissions are currently NOT enforced.
 * Since changes are explicitly stored in-memory, changes that exceed
   the local machine's memory will cause problems.
+
+
+Usage
+=====
+
+FSO supports context managers! Example:
+
+.. code-block:: python
+
+  import unittest, fso
+
+  class TestWithContextManager(unittest.TestCase):
+
+    def test_with_cm(self):
+
+      self.assertFalse(os.path.exists('no-such-file'))
+
+      with fso.push() as overlay:
+
+        self.assertFalse(os.path.exists('no-such-file'))
+
+        with open('no-such-file', 'wb') as fp:
+          fp.write('created')
+
+        self.assertTrue(os.path.exists('no-such-file'))
+        self.assertEqual(len(overlay.entries), 1)
+        entry = overlay.entries.values()[0]
+        self.assertEqual(entry.path, 'no-such-file')
+        self.assertEqual(entry.type, 'file')
+        self.assertEqual(entry.content, 'created')
+
+      self.assertFalse(os.path.exists('no-such-file'))
