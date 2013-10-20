@@ -105,7 +105,8 @@ a respectable minimum:
 Known Limitations
 =================
 
-* File permissions are currently NOT enforced.
+* The current implementation is very "bare bones" -- user be warned!
+* File permissions are currently NOT enforced (and might be overkill).
 * Since changes are explicitly stored in-memory, changes that exceed
   the local machine's memory will cause problems.
 
