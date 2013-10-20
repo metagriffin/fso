@@ -8,12 +8,12 @@ File System Overlay
   couple of weeks.
 
 
-File System Overlay (FSO) allows side-effect unit testing of file I/O
-operations. It does this by creating an overlay over the local file
-system which allows read-through access, but stores write operations
-in memory. These in-memory changes can be inspected, to validate unit
-tests, and when the test ends, all changes to the file system will
-vaporize (to quote Dr. Stanley Goodspeed).
+File System Overlay (FSO) allows side-effect free unit testing of file
+I/O operations. It does this by creating an overlay over the local
+file system which allows read-through access, but stores write
+operations in memory. These in-memory changes can be inspected, to
+validate unit tests, and when the test ends, all changes to the file
+system will vaporize (to quote Dr. Stanley Goodspeed).
 
 
 Project
