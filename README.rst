@@ -3,7 +3,7 @@ File System Overlay
 ===================
 
 File System Overlay (FSO) allows *side-effect free* unit testing of
-file I/O operations. It does this by creating an caching overlay over
+file I/O operations. It does this by creating a caching overlay over
 the local file system, allowing read-through access, but storeing
 write operations in memory. These in-memory changes can be inspected,
 to validate unit tests, and when the test completes, all changes to
