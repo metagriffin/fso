@@ -28,6 +28,8 @@ dependencies = [
   'distribute           >= 0.6.24',
   'six                  >= 1.4.1',
   'aadict               >= 0.2.0',
+  'globre               >= 0.0.5',
+  'asset                >= 0.0.4',
   ]
 
 entrypoints = {}

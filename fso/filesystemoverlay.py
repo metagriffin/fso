@@ -6,9 +6,7 @@
 # copy: (C) CopyLoose 2013 UberDev <hardcore@uberdev.org>, No Rights Reserved.
 #------------------------------------------------------------------------------
 
-import os, __builtin__, six
-
-from .resolve import resolve
+import os, __builtin__, six, asset
 
 #------------------------------------------------------------------------------
 class UnknownOverlayMode(Exception): pass
@@ -76,7 +74,7 @@ class FileSystemOverlay(object):
       return False
     for symbol, handle in self.impostors.items():
       mod, attr = symbol.split(':', 1)
-      mod = resolve(mod)
+      mod = asset.symbol(mod)
       if getattr(mod, attr) is not handle:
         return False
     return True
@@ -101,7 +99,7 @@ class FileSystemOverlay(object):
     self._installed = True
     for symbol, handle in self.impostors.items():
       mod, attr = symbol.split(':', 1)
-      mod = resolve(mod)
+      mod = asset.symbol(mod)
       self.originals[symbol] = getattr(mod, attr)
       setattr(mod, attr, handle)
     return self
@@ -115,7 +113,7 @@ class FileSystemOverlay(object):
     self._installed = False
     for symbol, handle in self.originals.items():
       mod, attr = symbol.split(':', 1)
-      mod = resolve(mod)
+      mod = asset.symbol(mod)
       setattr(mod, attr, handle)
     self.originals.clear()
     ret = dict(self.entries)
