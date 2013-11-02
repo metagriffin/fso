@@ -6,7 +6,7 @@
 # copy: (C) CopyLoose 2013 UberDev <hardcore@uberdev.org>, No Rights Reserved.
 #------------------------------------------------------------------------------
 
-import os, __builtin__, six, asset
+import six, asset
 
 #------------------------------------------------------------------------------
 class UnknownOverlayMode(Exception): pass
@@ -51,6 +51,14 @@ class OverlayFileStream(ContextStringIO):
 
 #------------------------------------------------------------------------------
 class FileSystemOverlay(object):
+
+  mapping = {
+    '__builtin__:open'  : 'fso_open',
+    'os:makedirs'       : 'fso_makedirs',
+    'os.path:exists'    : 'fso_exists',
+    'os:access'         : 'fso_access',
+    'os:unlink'         : 'fso_unlink',
+    }
 
   #----------------------------------------------------------------------------
   def __init__(self, install=False):
@@ -122,62 +130,62 @@ class FileSystemOverlay(object):
 
   #----------------------------------------------------------------------------
   def _makeImpostors(self):
+    if self.impostors:
+      raise ValueError('impostors have already been populated')
+    for orig, impost in self.mapping.items():
+      self.impostors[orig] = getattr(self, impost)
+    return self
 
-    #--------------------------------------------------------------------------
-    def fso_open(path, mode=None, buffering=None):
-      # tbd: what about *buffering*?...
-      if mode is None or 'r' in mode:
-        if path in self.entries:
-          if self.entries[path].type is OverlayEntry.TYPE_FILE:
-            return ContextStringIO(self.entries[path].content)
-          if self.entries[path].type is OverlayEntry.TYPE_DIR:
-            raise IOError(21, 'Is a directory', path)
-          # TBD: assuming self.entries[path].type == 'n'...
-          raise IOError(2, 'No such file or directory', path)
-        if mode is None:
-          return self.originals['__builtin__:open'](path)
-        return self.originals['__builtin__:open'](path, mode)
-      if 'w' in mode:
-        # TBD: check to see if it is a non-file...
-        return OverlayFileStream(self, path)
-      if 'a' in mode:
-        if path not in self.entries and self.originals['os.path:exists'](path):
-          # tbd: check to see if it is a readable file instead?
-          fp = self.originals['__builtin__:open'](path, 'rb')
-          self.entries[path] = OverlayEntry(path, OverlayEntry.TYPE_FILE, fp.read())
-          fp.close()
-        if path in self.entries:
-          return OverlayFileStream(self, path, prepend=self.entries[path].content)
-        return OverlayFileStream(self, path)
-      raise UnknownOverlayMode(mode)
-    self.impostors['__builtin__:open'] = fso_open
-
-    #--------------------------------------------------------------------------
-    def fso_makedirs(path, mode=None):
-      # TBD: implement file hierarchies in self.entries!...
-      pass
-    self.impostors['os:makedirs'] = fso_makedirs
-
-    #--------------------------------------------------------------------------
-    def fso_exists(path):
+  #----------------------------------------------------------------------------
+  def fso_open(self, path, mode=None, buffering=None):
+    # tbd: what about *buffering*?...
+    if mode is None or 'r' in mode:
       if path in self.entries:
-        return self.entries[path].type is not OverlayEntry.TYPE_GHOST
-      return self.originals['os.path:exists'](path)
-    self.impostors['os.path:exists'] = fso_exists
-
-    #--------------------------------------------------------------------------
-    def fso_access(path, mode):
+        if self.entries[path].type is OverlayEntry.TYPE_FILE:
+          return ContextStringIO(self.entries[path].content)
+        if self.entries[path].type is OverlayEntry.TYPE_DIR:
+          raise IOError(21, 'Is a directory', path)
+        # TBD: assuming self.entries[path].type == 'n'...
+        raise IOError(2, 'No such file or directory', path)
+      if mode is None:
+        return self.originals['__builtin__:open'](path)
+      return self.originals['__builtin__:open'](path, mode)
+    if 'w' in mode:
+      # TBD: check to see if it is a non-file...
+      return OverlayFileStream(self, path)
+    if 'a' in mode:
+      if path not in self.entries and self.originals['os.path:exists'](path):
+        # tbd: check to see if it is a readable file instead?
+        fp = self.originals['__builtin__:open'](path, 'rb')
+        self.entries[path] = OverlayEntry(path, OverlayEntry.TYPE_FILE, fp.read())
+        fp.close()
       if path in self.entries:
-        # TBD: implement better file access control...
-        # TBD: make this dependent on entry.type!...
-        return True
-      return self.originals['os:access'](path, mode)
-    self.impostors['os:access'] = fso_access
+        return OverlayFileStream(self, path, prepend=self.entries[path].content)
+      return OverlayFileStream(self, path)
+    raise UnknownOverlayMode(mode)
 
-    #--------------------------------------------------------------------------
-    def fso_unlink(path):
-      self.entries[path] = OverlayEntry(path, OverlayEntry.TYPE_GHOST, None)
-    self.impostors['os:unlink'] = fso_unlink
+  #----------------------------------------------------------------------------
+  def fso_makedirs(self, path, mode=None):
+    # TBD: implement file hierarchies in self.entries!...
+    pass
+
+  #----------------------------------------------------------------------------
+  def fso_exists(self, path):
+    if path in self.entries:
+      return self.entries[path].type is not OverlayEntry.TYPE_GHOST
+    return self.originals['os.path:exists'](path)
+
+  #----------------------------------------------------------------------------
+  def fso_access(self, path, mode):
+    if path in self.entries:
+      # TBD: implement better file access control...
+      # TBD: make this dependent on entry.type!...
+      return True
+    return self.originals['os:access'](path, mode)
+
+  #----------------------------------------------------------------------------
+  def fso_unlink(self, path):
+    self.entries[path] = OverlayEntry(path, OverlayEntry.TYPE_GHOST, None)
 
 #------------------------------------------------------------------------------
 # end of $Id$
