@@ -37,7 +37,7 @@ Use:
   class MyTest(unittest.TestCase):
 
     def setUp(self):
-      fso.push()
+      self.fso = fso.push()
 
     def tearDown(self):
       fso.pop()
@@ -56,7 +56,7 @@ Use:
 
       # you can also check that the expected changes are there (noting
       # that all paths are absolutized, dereferenced, and normalized):
-      self.assertEqual(fso.changes, [
+      self.assertEqual(self.fso.changes, [
         'add:/etc/foobar.conf',
         ])
 
