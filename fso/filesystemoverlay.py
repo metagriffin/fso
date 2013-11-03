@@ -6,27 +6,21 @@
 # copy: (C) CopyLoose 2013 UberDev <hardcore@uberdev.org>, No Rights Reserved.
 #------------------------------------------------------------------------------
 
-import six, asset
+# TODO: add support for all kinds of file types besides REG and LNK, ie:
+#         stat.S_ISCHR(mode)    == character special device file
+#         stat.S_ISBLK(mode)    == block special device file
+#         stat.S_ISFIFO(mode)   == FIFO (named pipe)
+#         stat.S_ISSOCK(mode)   == socket
+
+import os, six, asset, stat, collections
 
 #------------------------------------------------------------------------------
 class UnknownOverlayMode(Exception): pass
 
 #------------------------------------------------------------------------------
-class OverlayEntry(object):
-  # tbd: i should probably make this into a "file-like" object... that way
-  #      an open() can return this object and read's and write's can be checked
-  #      immediately...
-  TYPE_FILE    = 'file'
-  TYPE_DIR     = 'dir'
-  TYPE_SYMLINK = 'link'
-  TYPE_GHOST   = 'ghost'
-  def __init__(self, path, type=TYPE_FILE, content=None):
-    #: path: The FS overlay full path, eg. /path/to/filename.ext.
-    self.path    = path
-    #: type: The FS overlay type, which can be one of OverlayEntry.TYPE_*
-    self.type    = type
-    #: content: for TYPE_FILE entries, the actual content.
-    self.content = content
+OverlayStat = collections.namedtuple('OverlayStat', [
+  'st_mode', 'st_ino', 'st_dev', 'st_nlink', 'st_uid', 'st_gid',
+  'st_size', 'st_atime', 'st_mtime', 'st_ctime', 'st_overlay'])
 
 #------------------------------------------------------------------------------
 class ContextStringIO(six.StringIO):
@@ -38,26 +32,81 @@ class ContextStringIO(six.StringIO):
 
 #------------------------------------------------------------------------------
 class OverlayFileStream(ContextStringIO):
-  def __init__(self, overlay, path, *args, **kwargs):
+  def __init__(self, fso, path, *args, **kwargs):
     prepend = kwargs.pop('prepend', '')
     ContextStringIO.__init__(self, *args, **kwargs)
-    self.overlay = overlay
+    self.fso     = fso
     self.path    = path
     self.prepend = prepend
   def close(self):
-    self.overlay.entries[self.path] = OverlayEntry(
-      self.path, OverlayEntry.TYPE_FILE, self.prepend + self.getvalue())
+    self.fso._addentry(OverlayEntry(
+      self.fso, self.path, stat.S_IFREG, self.prepend + self.getvalue()))
     ContextStringIO.close(self)
+
+#------------------------------------------------------------------------------
+class OverlayEntry(object):
+  # todo: i should probably make this into a "file-like" object... that way
+  #       an open() can return this object and read's and write's can be checked
+  #       immediately...
+  def __init__(self, fso, path, mode=stat.S_IFREG, content=None, omode=None):
+    self.fso     = fso
+    #: path: The FS overlay full path, eg. /path/to/filename.ext.
+    self.path    = path
+    #: mode: The FS overlay entry type, which can be one of stat.S_IF*
+    self.mode    = mode
+    #: content: for S_IFREG entries, the actual content, for S_IFLNK
+    #:          entries, the target of the link.
+    self.content = content
+    #: omode: the overlayed entry type, if it existed
+    self.omode   = omode
+  @property
+  def stat(self):
+    if self.mode is None:
+      raise OSError(2, 'No such file or directory', self.path)
+    size = len(self.content or '')
+    return OverlayStat(
+      st_mode=self.mode, st_size=size, st_overlay=1,
+      # todo: if possible, inherit these from the original entry...
+      st_ino=0, st_dev=0, st_nlink=0, st_uid=0, st_gid=0,
+      st_atime=0, st_mtime=0, st_ctime=0)
+  @property
+  def change(self):
+    if self.mode is None:
+      return 'del:' + self.path
+    if self.omode is None:
+      return 'add:' + self.path
+    return 'mod:' + self.path
+  def __repr__(self):
+    return '<OverlayEntry %s mode=%r, omode=%r, content-length=%d>' % (
+      self.path, self.mode, self.omode, len(self.content or ''))
 
 #------------------------------------------------------------------------------
 class FileSystemOverlay(object):
 
   mapping = {
+
+    # note that many of the following are (in the python platform)
+    # implemented to use other functions that *are* already overlayed,
+    # so in theory they should not need overlaying... *HOWEVER*,
+    # because they are not overlay sensitive, the pop out to the
+    # currently installed overlay, and therefore are not multi-overlay
+    # compatible... ugh. perhaps this multi-overlay is just not worth
+    # it.
+
     '__builtin__:open'  : 'fso_open',
-    'os:makedirs'       : 'fso_makedirs',
-    'os.path:exists'    : 'fso_exists',
-    'os:access'         : 'fso_access',
     'os:unlink'         : 'fso_unlink',
+    'os:remove'         : 'fso_remove',
+    'os:readlink'       : 'fso_readlink',
+    'os:stat'           : 'fso_stat',
+    'os:lstat'          : 'fso_lstat',
+    'os:symlink'        : 'fso_symlink',
+    'os:listdir'        : 'fso_listdir',
+    'os:mkdir'          : 'fso_mkdir',
+    'os:makedirs'       : 'fso_makedirs',
+    'os:rmdir'          : 'fso_rmdir',
+    'os:access'         : 'fso_access',
+    'os.path:exists'    : 'fso_exists',
+    'os.path:lexists'   : 'fso_lexists',
     }
 
   #----------------------------------------------------------------------------
@@ -66,6 +115,7 @@ class FileSystemOverlay(object):
     self._installed = False
     self.impostors  = dict()
     self.originals  = dict()
+    self.vaporized  = None
     self._makeImpostors()
     if install:
       self.install()
@@ -124,9 +174,9 @@ class FileSystemOverlay(object):
       mod = asset.symbol(mod)
       setattr(mod, attr, handle)
     self.originals.clear()
-    ret = dict(self.entries)
+    self.vaporized = dict(self.entries)
     self.entries.clear()
-    return ret
+    return self.vaporized
 
   #----------------------------------------------------------------------------
   def _makeImpostors(self):
@@ -137,55 +187,324 @@ class FileSystemOverlay(object):
     return self
 
   #----------------------------------------------------------------------------
-  def fso_open(self, path, mode=None, buffering=None):
-    # tbd: what about *buffering*?...
-    if mode is None or 'r' in mode:
-      if path in self.entries:
-        if self.entries[path].type is OverlayEntry.TYPE_FILE:
-          return ContextStringIO(self.entries[path].content)
-        if self.entries[path].type is OverlayEntry.TYPE_DIR:
-          raise IOError(21, 'Is a directory', path)
-        # TBD: assuming self.entries[path].type == 'n'...
-        raise IOError(2, 'No such file or directory', path)
-      if mode is None:
-        return self.originals['__builtin__:open'](path)
-      return self.originals['__builtin__:open'](path, mode)
-    if 'w' in mode:
-      # TBD: check to see if it is a non-file...
-      return OverlayFileStream(self, path)
-    if 'a' in mode:
-      if path not in self.entries and self.originals['os.path:exists'](path):
-        # tbd: check to see if it is a readable file instead?
-        fp = self.originals['__builtin__:open'](path, 'rb')
-        self.entries[path] = OverlayEntry(path, OverlayEntry.TYPE_FILE, fp.read())
-        fp.close()
-      if path in self.entries:
-        return OverlayFileStream(self, path, prepend=self.entries[path].content)
-      return OverlayFileStream(self, path)
-    raise UnknownOverlayMode(mode)
+  @property
+  def changes(self):
+    return [self.entries[path].change for path in sorted(self.entries.keys())]
 
   #----------------------------------------------------------------------------
-  def fso_makedirs(self, path, mode=None):
-    # TBD: implement file hierarchies in self.entries!...
-    pass
+  @property
+  def diff(self):
+    # TODO: implement...
+    raise NotImplementedError()
+
+  #----------------------------------------------------------------------------
+  def _addentry(self, entry):
+    if entry.path in self.entries:
+      entry.omode = self.entries[entry.path].omode
+      if entry.mode is None and entry.omode is None:
+        del self.entries[entry.path]
+        return
+    else:
+      try:
+        entry.omode = stat.S_IFMT(self.originals['os:lstat'](entry.path).st_mode)
+      except Exception:
+        pass
+    self.entries[entry.path] = entry
+
+  #############################################################################
+
+  #----------------------------------------------------------------------------
+  def abs(self, path):
+    # TODO: on windows, convert '\\' to '/'...
+    return os.path.abspath(path)
+
+  #----------------------------------------------------------------------------
+  def deref(self, path, to_parent=False):
+    # TODO: make this work for windows too...
+    path = self.abs(path)
+    if to_parent:
+      head, tail = os.path.split(path)
+      return os.path.join(self.deref(head), tail)
+    # TODO: root on windows... ugh.
+    curpath  = '/'
+    segments = path.split('/')
+    for idx, seg in enumerate(segments):
+      curpath = os.path.join(curpath, seg)
+      st = self._lstat(curpath)
+      if stat.S_ISLNK(st.st_mode):
+        target = os.path.join(os.path.dirname(curpath), self.fso_readlink(curpath))
+        target = os.path.join(target, *segments[idx + 1:])
+        return self.deref(target)
+    return os.path.join('/', *segments)
+
+  #----------------------------------------------------------------------------
+  def _stat(self, path):
+    '''IMPORTANT: expects `path`'s parent to already be deref()'erenced.'''
+    if path not in self.entries:
+      return OverlayStat(*self.originals['os:stat'](path)[:10], st_overlay=0)
+    st = self.entries[path].stat
+    if stat.S_ISLNK(st.st_mode):
+      return self._stat(self.deref(path))
+    return st
+
+  #----------------------------------------------------------------------------
+  def _lstat(self, path):
+    '''IMPORTANT: expects `path`'s parent to already be deref()'erenced.'''
+    if path not in self.entries:
+      return OverlayStat(*self.originals['os:lstat'](path)[:10], st_overlay=0)
+    return self.entries[path].stat
+
+  #----------------------------------------------------------------------------
+  def fso_anystat(self, path, link):
+    # TODO: what about if path == '/'...
+    # TODO: make this work for windows too...
+    # steps:
+    #   - ensure that all directory components to dirname(path)
+    #     exist and are directories
+    #   - then check the file itself
+    path = self.abs(path)
+    head, tail = os.path.split(path)
+    head = self.deref(head)
+    st   = self._stat(head)
+    if not stat.S_ISDIR(st.st_mode):
+      raise OSError(20, 'Not a directory', path)
+    if link:
+      return self._lstat(os.path.join(head, tail))
+    return self._stat(os.path.join(head, tail))
+
+  #----------------------------------------------------------------------------
+  def fso_lstat(self, path):
+    'overlays os.lstat()'
+    return self.fso_anystat(path, link=True)
+
+  #----------------------------------------------------------------------------
+  def fso_stat(self, path):
+    'overlays os.stat()'
+    return self.fso_anystat(path, link=False)
+
+  #----------------------------------------------------------------------------
+  def _exists(self, path):
+    '''IMPORTANT: expects `path` to already be deref()'erenced.'''
+    try:
+      return bool(self._stat(path))
+    except os.error:
+      return False
+
+  #----------------------------------------------------------------------------
+  def _lexists(self, path):
+    '''IMPORTANT: expects `path` to already be deref()'erenced.'''
+    try:
+      return bool(self._lstat(path))
+    except os.error:
+      return False
 
   #----------------------------------------------------------------------------
   def fso_exists(self, path):
-    if path in self.entries:
-      return self.entries[path].type is not OverlayEntry.TYPE_GHOST
-    return self.originals['os.path:exists'](path)
+    'overlays os.path.exists()'
+    try:
+      return self._exists(self.deref(path))
+    except os.error:
+      return False
 
   #----------------------------------------------------------------------------
-  def fso_access(self, path, mode):
-    if path in self.entries:
-      # TBD: implement better file access control...
-      # TBD: make this dependent on entry.type!...
-      return True
-    return self.originals['os:access'](path, mode)
+  def fso_lexists(self, path):
+    'overlays os.path.lexists()'
+    try:
+      return self._lexists(self.deref(path, to_parent=True))
+    except os.error:
+      return False
+
+  #----------------------------------------------------------------------------
+  def fso_listdir(self, path):
+    'overlays os.listdir()'
+    path = self.deref(path)
+    if not stat.S_ISDIR(self._stat(path).st_mode):
+      raise OSError(20, 'Not a directory', path)
+    try:
+      ret = self.originals['os:listdir'](path)
+    except Exception:
+      # assuming that `path` was created within this FSO...
+      ret = []
+    for entry in self.entries.values():
+      if not entry.path.startswith(path + '/'):
+        continue
+      subpath = entry.path[len(path) + 1:]
+      if '/' in subpath:
+        continue
+      if entry.mode is None:
+        if subpath in ret:
+          ret.remove(subpath)
+      else:
+        if subpath not in ret:
+          ret.append(subpath)
+    return ret
+
+  #----------------------------------------------------------------------------
+  def fso_mkdir(self, path, mode=None):
+    'overlays os.mkdir()'
+    path = self.deref(path, to_parent=True)
+    if self._lexists(path):
+      raise OSError(17, 'File exists', path)
+    self._addentry(OverlayEntry(self, path, stat.S_IFDIR))
+
+  #----------------------------------------------------------------------------
+  def fso_makedirs(self, path, mode=None):
+    'overlays os.makedirs()'
+    path = self.abs(path)
+    cur = '/'
+    segments = path.split('/')
+    for idx, seg in enumerate(segments):
+      cur = os.path.join(cur, seg)
+      try:
+        st = self.fso_stat(cur)
+      except OSError:
+        st = None
+      if st is None:
+        self.fso_mkdir(cur)
+        continue
+      if idx + 1 == len(segments):
+        raise OSError(17, 'File exists', path)
+      if not stat.S_ISDIR(st.st_mode):
+        raise OSError(20, 'Not a directory', path)
+
+  #----------------------------------------------------------------------------
+  def fso_rmdir(self, path):
+    'overlays os.rmdir()'
+    st = self.fso_lstat(path)
+    if not stat.S_ISDIR(st.st_mode):
+      raise OSError(20, 'Not a directory', path)
+    if len(self.fso_listdir(path)) > 0:
+      raise OSError(39, 'Directory not empty', path)
+    self._addentry(OverlayEntry(self, path, None))
+
+  #----------------------------------------------------------------------------
+  def fso_readlink(self, path):
+    'overlays os.readlink()'
+    path = self.deref(path, to_parent=True)
+    st = self.fso_lstat(path)
+    if not stat.S_ISLNK(st.st_mode):
+      raise OSError(22, 'Invalid argument', path)
+    if st.st_overlay:
+      return self.entries[path].content
+    return self.originals['os:readlink'](path)
+
+  #----------------------------------------------------------------------------
+  def fso_symlink(self, source, link_name):
+    'overlays os.symlink()'
+    path = self.deref(link_name, to_parent=True)
+    if self._exists(path):
+      raise OSError(17, 'File exists')
+    self._addentry(OverlayEntry(self, path, stat.S_IFLNK, source))
 
   #----------------------------------------------------------------------------
   def fso_unlink(self, path):
-    self.entries[path] = OverlayEntry(path, OverlayEntry.TYPE_GHOST, None)
+    'overlays os.unlink()'
+    path = self.deref(path, to_parent=True)
+    if not self._lexists(path):
+      raise OSError(2, 'No such file or directory', path)
+    self._addentry(OverlayEntry(self, path, None))
+
+  #----------------------------------------------------------------------------
+  def fso_remove(self, path):
+    'overlays os.remove()'
+    return self.unlink(path)
+
+  #----------------------------------------------------------------------------
+  def fso_open(self, path, mode=None, buffering=None):
+    # todo: what about `buffering`?...
+    # todo: pass `mode` to ContextStringIO/OverlayFileStream so
+    #       that other params can be leveraged? eg. 'b' / '+' / 'U'...
+
+    if mode is None:
+      mode = 'r'
+    head, tail = os.path.split(path)
+    try:
+      head = self.deref(head)
+    except OSError:
+      raise IOError(2, 'No such file or directory', path)
+    st   = self._stat(head)
+    if not stat.S_ISDIR(st.st_mode):
+      raise IOError(2, 'No such file or directory', path)
+    path = os.path.join(head, tail)
+
+    # todo: do better sanity checking of 'mode'...
+
+    if 'r' in mode and ( 'w' in mode or 'a' in mode ) or '+' in mode:
+      # TODO: remove this restriction...
+      raise ValueError('unsupported FSO mode %s' % (mode,))
+
+    if 'r' not in mode and 'w' not in mode and 'a' not in mode:
+      raise UnknownOverlayMode(mode)
+
+    # todo: perhaps all operations should return an OverlayStream
+    #       so that "accidental" writes on a 'r' declared fp are
+    #       caught?... is that even a possible problem?
+
+    # read
+    if 'r' in mode:
+      try:
+        path = self.deref(path)
+        st = self._stat(path)
+      except OSError:
+        raise IOError(2, 'No such file or directory', path)
+      if stat.S_ISDIR(st.st_mode):
+        raise IOError(21, 'Is a directory', path)
+      if not stat.S_ISREG(st.st_mode):
+        raise IOError(2, 'No such file or directory', path)
+      if path in self.entries:
+        return ContextStringIO(self.entries[path].content)
+      return self.originals['__builtin__:open'](path, mode)
+
+    # write/append
+
+    # dereference all symlinks up until the tail is either a file or non-existent
+    while True:
+      head, tail = os.path.split(path)
+      try:
+        head = self.deref(head)
+      except OSError:
+        raise IOError(2, 'No such file or directory', path)
+      path = os.path.join(head, tail)
+      try:
+        st = self._lstat(path)
+      except OSError:
+        # the file does not exist -- swith 'a' to 'w' (if currently 'a')
+        if 'a' in mode:
+          mode = mode.replace('a', '')
+        if 'w' not in mode:
+          mode = 'w' + mode
+        break
+      if stat.S_ISREG(st.st_mode):
+        break
+      if stat.S_ISLNK(st.st_mode):
+        path = os.path.join(head, self.fso_readlink(path))
+        continue
+      raise IOError(21, 'FSO ERROR: unexpected stat while write/append', path)
+
+    # write
+    if 'a' not in mode:
+      return OverlayFileStream(self, path)
+
+    # append
+    if path in self.entries:
+      if self.entries[path].mode is None:
+        # note: this should never happen -- lstat() should have raised OSError()
+        return OverlayFileStream(self, path)
+      return OverlayFileStream(self, path, prepend=self.entries[path].content)
+
+    with self.originals['__builtin__:open'](path, 'rb') as fp:
+      return OverlayFileStream(self, path, prepend=fp.read())
+
+  #############################################################################
+
+  #----------------------------------------------------------------------------
+  def fso_access(self, path, mode):
+    raise NotImplementedError()
+    # if path in self.entries:
+    #   # TODO: implement better file access control...
+    #   # TODO: make this dependent on entry.mode!...
+    #   return True
+    # return self.originals['os:access'](path, mode)
 
 #------------------------------------------------------------------------------
 # end of $Id$

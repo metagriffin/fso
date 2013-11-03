@@ -65,13 +65,13 @@ file operations that gets replaced with mocks when performing tests
 This is, IMHO, a terrible approach, since it means that the real code
 is not being executed, and may well hide some very real bugs.
 
-Instead, the `fso` package switches out the implementation of the
-low-level file system calls, and caches changes in-memory, never
+As an alternative, the FSO package switches out the implementation of
+the low-level file system calls, and caches changes in-memory, never
 actually modifying the file system.
 
 Although this is a very "pure" approach, there are *many* gotchas...
 So, currently, only very basic file operations are supported (such as
-writing to a new file) -- if you are doing more complex things, fso is
+writing to a new file) -- if you are doing more complex things, FSO is
 not ready for you yet! But, if you don't mind, please help identify
 those holes by either reporting issues or providing patches... any
 contributions will be merged and very much appreciated!
@@ -84,23 +84,34 @@ Currently, only the following I/O functions have replacements
 implemented:
 
 * builtin.open
-* os.path.exists
-* os.makedirs
-* os.access
-* os.unlink
-
-
-Unsupported Operations
-======================
-
-The following need to be implemented in order to bring I/O coverage to
-a respectable minimum:
-
+* os.symlink
 * os.stat
-* os.path.isdir (might be covered by os.stat?)
-* os.path.isfile (might be covered by os.stat?)
-* os.path.islink (might be covered by os.stat?)
+* os.lstat
+* os.unlink
+* os.remove
 * os.listdir
+* os.mkdir
+* os.makedirs
+* os.rmdir
+* os.path.exists
+* os.path.lexists
+
+* os.access
+
+Most other I/O operations are built on top of these, so they
+implicitly work with FSO. **However**, because they use whatever
+instrumented functions are currently in the global scope, this means
+that they are not compatible with *multiple* levels of FSO overlays.
+Since that is not the typical FSO use-case, this is deemed an
+acceptable trade-off.
+
+Examples of I/O operations that are supported, but only when using a
+single active FSO layer:
+
+* os.walk
+* os.path.isdir
+* os.path.isfile
+* os.path.islink (on posix and windows -- *maybe* apple? who really cares?)
 
 
 Known Limitations
@@ -110,12 +121,20 @@ Known Limitations
 * File permissions are currently NOT enforced (and might be overkill).
 * Since changes are explicitly stored in-memory, changes that exceed
   the local machine's memory will cause problems.
-
+* The following categories of filesystem entries will not work:
+  * sockets
+  * block special device files
+  * character special device files
+  * FIFOs (named pipes)
 
 Usage
 =====
 
-FSO supports context managers! Example:
+FSO supports context managers! In most cases, this is actually
+recommend. The reason is that some unit testing frameworks, such as
+nose, do not report errors very well if an FSO layer is still
+active. Using the context manager will ensure that the FSO is
+uninstalled before they need to report the errors. Example:
 
 .. code-block:: python
 
