@@ -199,6 +199,26 @@ class FileSystemOverlay(object):
     return [self.entries[path].change for path in sorted(self.entries.keys())]
 
   #----------------------------------------------------------------------------
+  def getChanges(self, root=None, recurse=True, relative=True):
+    if root is None:
+      return self.changes
+    root = self.abs(root)
+    if not recurse:
+      if root not in self.entries:
+        return None
+      if relative:
+        return self.entries[root].change[:4]
+      return self.entries[root].change
+    ret = []
+    for path in sorted(self.entries.keys()):
+      if path == root or path.startswith(root + '/'):
+        change = self.entries[path].change
+        if relative:
+          change = change[:4] + change[4 + len(root) + 1:]
+        ret.append(change)
+    return ret
+
+  #----------------------------------------------------------------------------
   @property
   def diff(self):
     # TODO: implement...

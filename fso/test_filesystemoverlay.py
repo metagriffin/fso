@@ -426,16 +426,29 @@ class TestFileSystemOverlay(unittest.TestCase):
         fp.write('alive')
       with open(os.path.join(tdir, 'a/b/link'), 'ab') as fp:
         fp.write('then')
-      self.assertEqual(
-        fso.changes, [
-          'add:' + os.path.join(tdir, 'a/b/bling'),
-          'del:' + os.path.join(tdir, 'a/b/c'),
-          'del:' + os.path.join(tdir, 'a/b/c/d'),
-          'del:' + os.path.join(tdir, 'a/b/c/d/bar'),
-          'mod:' + os.path.join(tdir, 'a/b/file'),
-          'add:' + os.path.join(tdir, 'a/b/no-such-file'),
-          'mod:' + os.path.join(tdir, 'a/b/zig'),
-          ])
+      self.assertEqual(fso.changes, [
+        'add:' + os.path.join(tdir, 'a/b/bling'),
+        'del:' + os.path.join(tdir, 'a/b/c'),
+        'del:' + os.path.join(tdir, 'a/b/c/d'),
+        'del:' + os.path.join(tdir, 'a/b/c/d/bar'),
+        'mod:' + os.path.join(tdir, 'a/b/file'),
+        'add:' + os.path.join(tdir, 'a/b/no-such-file'),
+        'mod:' + os.path.join(tdir, 'a/b/zig'),
+        ])
+      self.assertEqual(fso.getChanges(tdir), [
+        'add:a/b/bling',
+        'del:a/b/c',
+        'del:a/b/c/d',
+        'del:a/b/c/d/bar',
+        'mod:a/b/file',
+        'add:a/b/no-such-file',
+        'mod:a/b/zig',
+        ])
+      self.assertEqual(fso.getChanges(os.path.join(tdir, 'a/b/c')), [
+        'del:',
+        'del:d',
+        'del:d/bar',
+        ])
     chk = [
       (tdir, ['a'], []),
       (os.path.join(tdir, 'a'), ['b'], []),
