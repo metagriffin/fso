@@ -6,6 +6,7 @@
   - os
   - os.path
   - shutil
+  - tempfile
   - fnmatch
   - glob
   - stat 
