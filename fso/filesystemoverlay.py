@@ -64,8 +64,13 @@ class OverlayEntry(object):
     if self.mode is None:
       raise OSError(2, 'No such file or directory', self.path)
     size = len(self.content or '')
+    mode = self.mode
+    if mode == stat.S_IFDIR:
+      mode |= stat.S_IRWXU
+    else:
+      mode |= stat.S_IRUSR | stat.S_IWUSR
     return OverlayStat(
-      st_mode=self.mode, st_size=size, st_overlay=1,
+      st_mode=mode, st_size=size, st_overlay=1,
       # todo: if possible, inherit these from the original entry...
       st_ino=0, st_dev=0, st_nlink=0, st_uid=0, st_gid=0,
       st_atime=0, st_mtime=0, st_ctime=0)
@@ -317,6 +322,20 @@ class FileSystemOverlay(object):
       return False
 
   #----------------------------------------------------------------------------
+  def fso_access(self, path, mode):
+    try:
+      st = self.fso_stat(path)
+    except OSError:
+      return False
+    if mode & os.X_OK and not ( st.st_mode & ( stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH ) ):
+      return False
+    if mode & os.W_OK and not ( st.st_mode & ( stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH ) ):
+      return False
+    if mode & os.R_OK and not ( st.st_mode & ( stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH ) ):
+      return False
+    return True
+
+  #----------------------------------------------------------------------------
   def fso_listdir(self, path):
     'overlays os.listdir()'
     path = self.deref(path)
@@ -544,17 +563,6 @@ class FileSystemOverlay(object):
 
     with self.originals['__builtin__:open'](path, 'rb') as fp:
       return OverlayFileStream(self, path, prepend=fp.read())
-
-  #############################################################################
-
-  #----------------------------------------------------------------------------
-  def fso_access(self, path, mode):
-    raise NotImplementedError()
-    # if path in self.entries:
-    #   # TODO: implement better file access control...
-    #   # TODO: make this dependent on entry.mode!...
-    #   return True
-    # return self.originals['os:access'](path, mode)
 
 #------------------------------------------------------------------------------
 # end of $Id$

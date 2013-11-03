@@ -204,6 +204,49 @@ class TestFileSystemOverlay(unittest.TestCase):
     self.assertFalse(os.path.exists(fname), 'write-through occurred')
 
   #----------------------------------------------------------------------------
+  def test_access(self):
+    tdir = tempfile.mkdtemp(prefix='fso-test_filesystemoverlay-unittest.access.')
+    os.makedirs(os.path.join(tdir, 'a/b/c/d'))
+    os.symlink('foo',os.path.join(tdir, 'a/b/c/d/bar'))
+    with open(os.path.join(tdir, 'a/b/c/file'), 'wb') as fp:
+      fp.write('data')
+    self.assertTrue(os.access(os.path.join(tdir, 'a/b/c/file'), os.F_OK | os.R_OK | os.W_OK))
+    self.assertFalse(os.access(os.path.join(tdir, 'a/b/c/file'), os.X_OK))
+    self.assertTrue(os.access(os.path.join(tdir, 'a/b/c/file'), os.W_OK))
+    self.assertTrue(os.access(os.path.join(tdir, 'a/b/c/file'), os.R_OK))
+    self.assertFalse(os.access(os.path.join(tdir, 'a/b/c/notfile'), os.F_OK))
+    self.assertFalse(os.access(os.path.join(tdir, 'a/b/c/notfile'), os.X_OK))
+    self.assertFalse(os.access(os.path.join(tdir, 'a/b/c/notfile'), os.W_OK))
+    self.assertFalse(os.access(os.path.join(tdir, 'a/b/c/notfile'), os.R_OK))
+    with FileSystemOverlay() as fso:
+      self.assertTrue(os.access(os.path.join(tdir, 'a/b/c/file'), os.F_OK | os.R_OK | os.W_OK))
+      self.assertFalse(os.access(os.path.join(tdir, 'a/b/c/file'), os.X_OK))
+      self.assertTrue(os.access(os.path.join(tdir, 'a/b/c/file'), os.W_OK))
+      self.assertTrue(os.access(os.path.join(tdir, 'a/b/c/file'), os.R_OK))
+      self.assertFalse(os.access(os.path.join(tdir, 'a/b/c/notfile'), os.F_OK))
+      self.assertFalse(os.access(os.path.join(tdir, 'a/b/c/notfile'), os.X_OK))
+      self.assertFalse(os.access(os.path.join(tdir, 'a/b/c/notfile'), os.W_OK))
+      self.assertFalse(os.access(os.path.join(tdir, 'a/b/c/notfile'), os.R_OK))
+      os.mkdir(os.path.join(tdir, 'a/fso'))
+      with open(os.path.join(tdir, 'a/fso/file'), 'wb') as fp:
+        fp.write('fso.data')
+      self.assertTrue(os.access(os.path.join(tdir, 'a/fso/file'), os.F_OK | os.R_OK | os.W_OK))
+      self.assertFalse(os.access(os.path.join(tdir, 'a/fso/file'), os.X_OK))
+      self.assertTrue(os.access(os.path.join(tdir, 'a/fso/file'), os.W_OK))
+      self.assertTrue(os.access(os.path.join(tdir, 'a/fso/file'), os.R_OK))
+      self.assertFalse(os.access(os.path.join(tdir, 'a/fso/notfile'), os.F_OK))
+      self.assertFalse(os.access(os.path.join(tdir, 'a/fso/notfile'), os.X_OK))
+      self.assertFalse(os.access(os.path.join(tdir, 'a/fso/notfile'), os.W_OK))
+      self.assertFalse(os.access(os.path.join(tdir, 'a/fso/notfile'), os.R_OK))
+    os.unlink(os.path.join(tdir, 'a/b/c/d/bar'))
+    os.unlink(os.path.join(tdir, 'a/b/c/file'))
+    os.rmdir(os.path.join(tdir, 'a/b/c/d'))
+    os.rmdir(os.path.join(tdir, 'a/b/c'))
+    os.rmdir(os.path.join(tdir, 'a/b'))
+    os.rmdir(os.path.join(tdir, 'a'))
+    os.rmdir(tdir)
+
+  #----------------------------------------------------------------------------
   def test_append(self):
     fname = tempfile.mktemp(prefix='fso-test_filesystemoverlay-unittest.append.')
     fso = FileSystemOverlay(install=False)
