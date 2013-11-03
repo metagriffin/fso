@@ -53,6 +53,12 @@ Use:
 
       # BUT, when testing ends, /etc/foobar.conf will not exist! *awesome*! :)
 
+      # you can also check that the expected changes are there (noting
+      # that all paths are absolutized, dereferenced, and normalized):
+      self.assertEqual(fso.changes, [
+        'add:/etc/foobar.conf',
+        ])
+
 
 Overview
 ========
@@ -153,12 +159,17 @@ uninstalled before they need to report the errors. Example:
         with open('no-such-file', 'wb') as fp:
           fp.write('created')
 
+        os.unlink('/etc/hosts')
+        os.mkdir('/tmp/my-test-directory')
+
         self.assertTrue(os.path.exists('no-such-file'))
-        self.assertEqual(len(overlay.entries), 1)
-        entry = overlay.entries.values()[0]
-        self.assertEqual(entry.path, 'no-such-file')
-        self.assertEqual(entry.type, 'file')
-        self.assertEqual(entry.content, 'created')
+        self.assertEqual(overlay.changes, [
+          'del:/etc/hosts',
+          'add:/path/to/cwd/no-such-file',
+          'add:/tmp/my-test-directory',
+          ])
 
       self.assertFalse(os.path.exists('no-such-file'))
+      self.assertFalse(os.path.exists('/etc/my-test-directory'))
+      self.assertTrue(os.path.exists('/etc/hosts'))
 
