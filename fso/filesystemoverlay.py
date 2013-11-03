@@ -239,6 +239,8 @@ class FileSystemOverlay(object):
     self.entries[entry.path] = entry
 
   #############################################################################
+  ### ... AND NOW, THE IMPOSTORS ! ############################################
+  #############################################################################
 
   #----------------------------------------------------------------------------
   def abs(self, path):
@@ -504,7 +506,7 @@ class FileSystemOverlay(object):
     # todo: pass `mode` to ContextStringIO/OverlayFileStream so
     #       that other params can be leveraged? eg. 'b' / '+' / 'U'...
 
-    if mode is None:
+    if mode is None or mode in ('U', 'rU'):
       mode = 'r'
     head, tail = os.path.split(path)
     try:

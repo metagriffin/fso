@@ -105,6 +105,7 @@ implemented:
 * os.path.exists
 * os.path.lexists
 * os.access
+* os.path.islink
 
 Most other I/O operations are built on top of these, so they
 implicitly work with FSO. **However**, because they use whatever
@@ -119,16 +120,15 @@ single active FSO layer:
 * os.walk
 * os.path.isdir
 * os.path.isfile
-* os.path.islink (on posix and windows -- *maybe* apple? who really cares?)
 
 
 Known Limitations
 =================
 
-* The current implementation is very "bare bones" -- user be warned!
 * File permissions are currently NOT enforced (and might be overkill),
   and overlayed directories report mode 0700, and overlayed files
   and symlinks report mode 0600.
+* File open modes of 'U' and 'rU' are silently treated as 'r'.
 * The following `stat` attributes are not available/managed:
   * st_ino
   * st_dev
