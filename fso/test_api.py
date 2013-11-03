@@ -6,7 +6,7 @@
 # copy: (C) CopyLoose 2009 UberDev <hardcore@uberdev.org>, No Rights Reserved.
 #------------------------------------------------------------------------------
 
-import sys, os, unittest, tempfile, uuid
+import sys, os, unittest, tempfile, uuid, stat
 
 from . import api
 
@@ -26,7 +26,7 @@ class TestApi(unittest.TestCase):
       self.assertEqual(len(overlay.entries), 1)
       entry = overlay.entries.values()[0]
       self.assertEqual(entry.path, fname)
-      self.assertEqual(entry.type, 'file')
+      self.assertEqual(entry.mode, stat.S_IFREG)
       self.assertEqual(entry.content, tdata)
     self.assertFalse(os.path.exists(fname))
 
