@@ -12,7 +12,7 @@
 #         stat.S_ISFIFO(mode)   == FIFO (named pipe)
 #         stat.S_ISSOCK(mode)   == socket
 
-import os, six, asset, stat, collections
+import sys, os, six, asset, stat, collections
 
 #------------------------------------------------------------------------------
 class UnknownOverlayMode(Exception): pass
@@ -107,6 +107,8 @@ class FileSystemOverlay(object):
     'os:access'         : 'fso_access',
     'os.path:exists'    : 'fso_exists',
     'os.path:lexists'   : 'fso_lexists',
+    'os.path:islink'    : 'fso_islink',
+    'shutil:rmtree'     : 'fso_rmtree',
     }
 
   #----------------------------------------------------------------------------
@@ -407,7 +409,55 @@ class FileSystemOverlay(object):
   #----------------------------------------------------------------------------
   def fso_remove(self, path):
     'overlays os.remove()'
-    return self.unlink(path)
+    return self.fso_unlink(path)
+
+  #----------------------------------------------------------------------------
+  def fso_islink(self, path):
+    'overlays os.path.islink()'
+    try:
+      return stat.S_ISLNK(self.fso_lstat(path).st_mode)
+    except OSError:
+      return False
+
+  #----------------------------------------------------------------------------
+  def fso_rmtree(self, path, ignore_errors=False, onerror=None):
+    'overlays shutil.rmtree()'
+    if ignore_errors:
+      def onerror(*args):
+        pass
+    elif onerror is None:
+      def onerror(*args):
+        raise
+    try:
+      if self.fso_islink(path):
+        # symlinks to directories are forbidden, see shutil bug #1669
+        raise OSError('Cannot call rmtree on a symbolic link')
+    except OSError:
+      onerror(os.path.islink, path, sys.exc_info())
+      # can't continue even if onerror hook returns
+      return
+    names = []
+    try:
+      names = self.fso_listdir(path)
+    except os.error, err:
+      onerror(os.listdir, path, sys.exc_info())
+    for name in names:
+      fullname = os.path.join(path, name)
+      try:
+        mode = self.fso_lstat(fullname).st_mode
+      except os.error:
+        mode = 0
+      if stat.S_ISDIR(mode):
+        self.fso_rmtree(fullname, ignore_errors, onerror)
+      else:
+        try:
+          self.fso_remove(fullname)
+        except OSError as err:
+          onerror(os.remove, fullname, sys.exc_info())
+    try:
+      self.fso_rmdir(path)
+    except os.error:
+      onerror(os.rmdir, path, sys.exc_info())
 
   #----------------------------------------------------------------------------
   def fso_open(self, path, mode=None, buffering=None):

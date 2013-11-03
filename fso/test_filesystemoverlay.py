@@ -10,7 +10,7 @@
 # shutil.rmtree() when doing a `os.rmdir()` so that the presence of
 # any unexpected files will cause an exception.
 
-import sys, os, unittest, tempfile, stat
+import sys, os, unittest, tempfile, stat, shutil
 
 from .filesystemoverlay import FileSystemOverlay
 
@@ -150,6 +150,42 @@ class TestFileSystemOverlay(unittest.TestCase):
     os.unlink(os.path.join(tdir, 'a/b/c/d/bar'))
     os.rmdir(os.path.join(tdir, 'a/b/c/d'))
     os.rmdir(os.path.join(tdir, 'a/b/c'))
+    os.rmdir(os.path.join(tdir, 'a/b'))
+    os.rmdir(os.path.join(tdir, 'a'))
+    os.rmdir(tdir)
+
+  #----------------------------------------------------------------------------
+  def test_rmtree(self):
+    tdir = tempfile.mkdtemp(prefix='fso-test_filesystemoverlay-unittest.rmtree.')
+    self.assertEqual(os.listdir(tdir), [])
+    os.makedirs(os.path.join(tdir, 'a/b/c/d'))
+    os.symlink('foo', os.path.join(tdir, 'a/b/c/d/bar'))
+    with open(os.path.join(tdir, 'a/b/c/file'), 'wb') as fp:
+      fp.write('data')
+    no_fso_walk = [
+      (tdir, ['a'], []),
+      (os.path.join(tdir, 'a'), ['b'], []),
+      (os.path.join(tdir, 'a/b'), ['c'], []),
+      (os.path.join(tdir, 'a/b/c'), ['d'], ['file']),
+      (os.path.join(tdir, 'a/b/c/d'), [], ['bar']),
+      ]
+    self.assertEqual(list(os.walk(tdir)), no_fso_walk)
+    with FileSystemOverlay() as fso:
+      self.assertEqual(list(os.walk(tdir)), no_fso_walk)
+      shutil.rmtree(os.path.join(tdir, 'a/b/c'))
+      self.assertEqual(list(os.walk(tdir)), [
+        (tdir, ['a'], []),
+        (os.path.join(tdir, 'a'), ['b'], []),
+        (os.path.join(tdir, 'a/b'), [], []),
+        ])
+      self.assertEqual(fso.changes, [
+        'del:' + os.path.join(tdir, 'a/b/c'),
+        'del:' + os.path.join(tdir, 'a/b/c/d'),
+        'del:' + os.path.join(tdir, 'a/b/c/d/bar'),
+        'del:' + os.path.join(tdir, 'a/b/c/file'),
+        ])
+    self.assertEqual(list(os.walk(tdir)), no_fso_walk)
+    shutil.rmtree(os.path.join(tdir, 'a/b/c'))
     os.rmdir(os.path.join(tdir, 'a/b'))
     os.rmdir(os.path.join(tdir, 'a'))
     os.rmdir(tdir)
