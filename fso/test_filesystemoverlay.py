@@ -6,6 +6,10 @@
 # copy: (C) CopyLoose 2009 UberDev <hardcore@uberdev.org>, No Rights Reserved.
 #------------------------------------------------------------------------------
 
+# IMPORTANT NOTE: in these routines, i am purposefully not doing a
+# shutil.rmtree() when doing a `os.rmdir()` so that the presence of
+# any unexpected files will cause an exception.
+
 import sys, os, unittest, tempfile, stat
 
 from .filesystemoverlay import FileSystemOverlay
@@ -84,8 +88,6 @@ class TestFileSystemOverlay(unittest.TestCase):
     for tfile in tfiles:
       self.assertFalse(os.path.exists(os.path.join(tdir, tfile)))
     self.assertEqual(os.listdir(tdir), [])
-    # note: purposefully not doing a shutil.rmtree() so that any unexpected
-    # files will cause an exception.
     os.rmdir(tdir)
 
   #----------------------------------------------------------------------------
