@@ -7,7 +7,8 @@ file I/O operations. It does this by creating a caching overlay over
 the local file system, allowing read-through access, but storing
 modifications in memory. These in-memory changes can be inspected, to
 validate unit tests, and when the test completes, all changes to the
-file system will be vaporized (to quote Dr. Stanley Goodspeed:
+file system will be vaporized and blown out to see (to quote
+Dr. Stanley Goodspeed:
 http://www.youtube.com/watch?v=K-uEbYq9kNU&t=6m29s).
 
 
@@ -75,12 +76,14 @@ As an alternative, the FSO package switches out the implementation of
 the low-level file system calls, and caches changes in-memory, never
 actually modifying the file system.
 
-Although this is a very "pure" approach, there are *many* gotchas...
-So, currently, only very basic file operations are supported (such as
-writing to a new file) -- if you are doing more complex things, FSO is
-not ready for you yet! But, if you don't mind, please help identify
-those holes by either reporting issues or providing patches... any
-contributions will be merged and very much appreciated!
+Although this is a very "pure" approach, there are some gotchas...
+So, currently, only basic file operations are supported (such as
+creating and deleting files and directories) -- if you are doing more
+complex things such as opening unix domain sockets and working with
+block-special devices, FSO may not be up to the task. But, if you
+don't mind, please help identify those holes by either reporting
+issues or providing patches... any contributions will be merged and
+very much appreciated!
 
 
 Supported Operations
