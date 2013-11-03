@@ -1,0 +1,13 @@
+- create a mode where no local files are accessed. (hmm, will
+  that even block python library requests?... will need to
+  whitelist that -- perhaps with generic whitelisting facility?)
+
+- look through all modules to find holes... LOL.
+  - os
+  - os.path
+  - shutil
+  - fnmatch
+  - glob
+  - stat 
+  - pathclass (https://wiki.python.org/moin/PathClass)
+
