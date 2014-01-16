@@ -515,6 +515,33 @@ class TestFileSystemOverlay(unittest.TestCase):
       self.assertTrue(os.path.exists(fname))
     self.assertFalse(os.path.exists(fname))
 
+  #----------------------------------------------------------------------------
+  def test_passthru_mktemp(self):
+    with FileSystemOverlay(passthru='.*fso-unittest\\.passthru\\.keep\\..*') as fso:
+      fkeep = tempfile.mktemp(prefix='fso-unittest.passthru.keep.')
+      fdrop = tempfile.mktemp(prefix='fso-unittest.passthru.drop.')
+      with open(fkeep, 'wb') as fp:
+        fp.write('keep')
+      with open(fdrop, 'wb') as fp:
+        fp.write('drop')
+    self.assertFalse(os.path.exists(fdrop))
+    self.assertTrue(os.path.exists(fkeep))
+    self.assertEqual(open(fkeep, 'rb').read(), 'keep')
+
+  #----------------------------------------------------------------------------
+  def test_passthru_mkstemp(self):
+    with FileSystemOverlay(passthru='.*fso-unittest\\.passthru\\.keep\\..*') as fso:
+      kfd, fkeep = tempfile.mkstemp(prefix='fso-unittest.passthru.keep.')
+      dfd, fdrop = tempfile.mkstemp(prefix='fso-unittest.passthru.drop.')
+      with os.fdopen(kfd, 'wb') as fp:
+        fp.write('keep')
+      with os.fdopen(dfd, 'wb') as fp:
+        fp.write('drop')
+    self.assertFalse(os.path.exists(fdrop))
+    self.assertTrue(os.path.exists(fkeep))
+    self.assertEqual(open(fkeep, 'rb').read(), 'keep')
+
+
 #------------------------------------------------------------------------------
 # end of $Id$
 #------------------------------------------------------------------------------

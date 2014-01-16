@@ -138,7 +138,7 @@ class FileSystemOverlay(object):
     }
 
   #----------------------------------------------------------------------------
-  def __init__(self, install=False):
+  def __init__(self, install=False, passthru=None):
     '''
     :Parameters:
 
@@ -146,6 +146,15 @@ class FileSystemOverlay(object):
 
       Flag indicating whether or not this overlay should be
       installed upon instantiation.
+
+    passthru : list({str, regex}), optional, default: none
+
+      A regular expression (or list thereof) that will be matched
+      against any file that is operated on; if it matches, no overlay
+      will be applied, i.e. this list excludes a set of files. The
+      specified regexes can be either strings or re.RegexObject
+      instances. Note that these regexes will be given only the
+      fully-dereferenced paths to be tested.
     '''
     self.entries    = {}
     self._installed = False
@@ -153,6 +162,12 @@ class FileSystemOverlay(object):
     self.originals  = dict()
     self.vaporized  = None
     self.fds        = dict()
+    self.passthru   = passthru or []
+    if self.passthru:
+      if not morph.isseq(self.passthru):
+        self.passthru = [self.passthru]
+      self.passthru = [re.compile(expr) if morph.isstr(expr) else expr
+                       for expr in self.passthru]
     self._makeImpostors()
     if install:
       self.install()
@@ -543,10 +558,15 @@ class FileSystemOverlay(object):
       head = self.deref(head)
     except OSError:
       raise IOError(errno.ENOENT, 'No such file or directory', path)
+    path = os.path.join(head, tail)
+
+    for regex in self.passthru:
+      if regex.match(path):
+        return self.originals['__builtin__:open'](path, mode)
+
     st   = self._stat(head)
     if not stat.S_ISDIR(st.st_mode):
       raise IOError(errno.ENOENT, 'No such file or directory', path)
-    path = os.path.join(head, tail)
 
     # todo: do better sanity checking of 'mode'...
 
