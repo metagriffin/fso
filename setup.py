@@ -30,6 +30,7 @@ dependencies = [
   'aadict               >= 0.2.0',
   'globre               >= 0.0.5',
   'asset                >= 0.0.4',
+  'morph                >= 0.1.1',
   ]
 
 entrypoints = {}
@@ -41,8 +42,7 @@ classifiers = [
   'Programming Language :: Python',
   'Operating System :: OS Independent',
   'Natural Language :: English',
-  'License :: OSI Approved :: MIT License',
-  'License :: Public Domain',
+  'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
   ]
 
 setup(
@@ -63,7 +63,7 @@ setup(
   tests_require         = test_dependencies,
   test_suite            = 'fso',
   entry_points          = entrypoints,
-  license               = 'MIT (http://opensource.org/licenses/MIT)',
+  license               = 'GPLv3+',
   )
 
 #------------------------------------------------------------------------------
