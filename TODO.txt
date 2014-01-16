@@ -12,3 +12,8 @@
   - stat 
   - pathclass (https://wiki.python.org/moin/PathClass)
 
+- move to use `stub`... handles direct imports :)
+  http://stub.readthedocs.org/en/latest/stubvsmock.html
+
+- review the current file descriptor bridging mechanism... i think
+  it makes assumptions on usage that may break the unusual use cases.
