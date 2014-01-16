@@ -23,7 +23,7 @@
 # shutil.rmtree() when doing a `os.rmdir()` so that the presence of
 # any unexpected files will cause an exception.
 
-import sys, os, unittest, tempfile, stat, shutil
+import sys, os, unittest, tempfile, stat, shutil, uuid
 
 from .filesystemoverlay import FileSystemOverlay
 
@@ -486,6 +486,34 @@ class TestFileSystemOverlay(unittest.TestCase):
     os.rmdir(os.path.join(tdir, 'a/b'))
     os.rmdir(os.path.join(tdir, 'a'))
     os.rmdir(tdir)
+
+  #----------------------------------------------------------------------------
+  def test_tempfile_mktemp(self):
+    with FileSystemOverlay() as fso:
+      fname = tempfile.mktemp(prefix='fso-test_filesystemoverlay-unittest.mktemp.')
+      with open(fname, 'wb') as fp:
+        fp.write('fname: ' + fname + '\n')
+    self.assertFalse(os.path.exists(fname))
+
+  #----------------------------------------------------------------------------
+  def test_tempfile_mkstemp(self):
+    with FileSystemOverlay() as fso:
+      fd, fname = tempfile.mkstemp(prefix='fso-test_filesystemoverlay-unittest.mkstemp.')
+      with os.fdopen(fd, 'wb') as fp:
+        fp.write('fname: ' + fname + '\n')
+    self.assertFalse(os.path.exists(fname))
+
+  #----------------------------------------------------------------------------
+  def test_os_open(self):
+    fname = '/tmp/fso-unittest.osopen-' + str(uuid.uuid4()) + '.tmp'
+    with FileSystemOverlay() as fso:
+      fd = os.open(fname, os.O_CREAT|os.O_WRONLY, 0644)
+      os.write(fd, 'osopen.test\n')
+      os.close(fd)
+      with open(fname, 'rb') as fp:
+        self.assertEqual(fp.read(), 'osopen.test\n')
+      self.assertTrue(os.path.exists(fname))
+    self.assertFalse(os.path.exists(fname))
 
 #------------------------------------------------------------------------------
 # end of $Id$

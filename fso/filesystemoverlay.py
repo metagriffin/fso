@@ -26,6 +26,9 @@
 #         stat.S_ISSOCK(mode)   == socket
 
 import sys, os, six, asset, stat, collections
+import errno
+import re
+import morph
 
 #------------------------------------------------------------------------------
 class UnknownOverlayMode(Exception): pass
@@ -123,6 +126,11 @@ class FileSystemOverlay(object):
     'os:makedirs'       : 'fso_makedirs',
     'os:rmdir'          : 'fso_rmdir',
     'os:access'         : 'fso_access',
+    'os:open'           : 'fso_os_open',
+    'os:fdopen'         : 'fso_os_fdopen',
+    'os:read'           : 'fso_os_read',
+    'os:write'          : 'fso_os_write',
+    'os:close'          : 'fso_os_close',
     'os.path:exists'    : 'fso_exists',
     'os.path:lexists'   : 'fso_lexists',
     'os.path:islink'    : 'fso_islink',
@@ -131,11 +139,20 @@ class FileSystemOverlay(object):
 
   #----------------------------------------------------------------------------
   def __init__(self, install=False):
+    '''
+    :Parameters:
+
+    install : bool, optional, default: false
+
+      Flag indicating whether or not this overlay should be
+      installed upon instantiation.
+    '''
     self.entries    = {}
     self._installed = False
     self.impostors  = dict()
     self.originals  = dict()
     self.vaporized  = None
+    self.fds        = dict()
     self._makeImpostors()
     if install:
       self.install()
@@ -525,10 +542,10 @@ class FileSystemOverlay(object):
     try:
       head = self.deref(head)
     except OSError:
-      raise IOError(2, 'No such file or directory', path)
+      raise IOError(errno.ENOENT, 'No such file or directory', path)
     st   = self._stat(head)
     if not stat.S_ISDIR(st.st_mode):
-      raise IOError(2, 'No such file or directory', path)
+      raise IOError(errno.ENOENT, 'No such file or directory', path)
     path = os.path.join(head, tail)
 
     # todo: do better sanity checking of 'mode'...
@@ -550,11 +567,11 @@ class FileSystemOverlay(object):
         path = self.deref(path)
         st = self._stat(path)
       except OSError:
-        raise IOError(2, 'No such file or directory', path)
+        raise IOError(errno.ENOENT, 'No such file or directory', path)
       if stat.S_ISDIR(st.st_mode):
-        raise IOError(21, 'Is a directory', path)
+        raise IOError(errno.EISDIR, 'Is a directory', path)
       if not stat.S_ISREG(st.st_mode):
-        raise IOError(2, 'No such file or directory', path)
+        raise IOError(errno.ENOENT, 'No such file or directory', path)
       if path in self.entries:
         return ContextStringIO(self.entries[path].content)
       return self.originals['__builtin__:open'](path, mode)
@@ -567,7 +584,7 @@ class FileSystemOverlay(object):
       try:
         head = self.deref(head)
       except OSError:
-        raise IOError(2, 'No such file or directory', path)
+        raise IOError(errno.ENOENT, 'No such file or directory', path)
       path = os.path.join(head, tail)
       try:
         st = self._lstat(path)
@@ -583,7 +600,8 @@ class FileSystemOverlay(object):
       if stat.S_ISLNK(st.st_mode):
         path = os.path.join(head, self.fso_readlink(path))
         continue
-      raise IOError(21, 'FSO ERROR: unexpected stat while write/append', path)
+      raise IOError(
+        errno.EISDIR, 'FSO ERROR: unexpected stat while write/append', path)
 
     # write
     if 'a' not in mode:
@@ -598,6 +616,78 @@ class FileSystemOverlay(object):
 
     with self.originals['__builtin__:open'](path, 'rb') as fp:
       return OverlayFileStream(self, path, prepend=fp.read())
+
+  #----------------------------------------------------------------------------
+  def fso_os_open(self, path, flags, mode=0777):
+    # todo: support all `flags` bits:
+    #         os.O_APPEND
+    #         os.O_CREAT
+    #         os.O_EXCL
+    #         os.O_TRUNC
+    #         os.O_DSYNC
+    #         os.O_RSYNC
+    #         os.O_SYNC
+    #         os.O_NDELAY
+    #         os.O_NONBLOCK
+    #         os.O_NOCTTY
+    #         os.O_SHLOCK
+    #         os.O_EXLOCK
+    #         os.O_BINARY
+    #         os.O_NOINHERIT
+    #         os.O_SHORT_LIVED
+    #         os.O_TEMPORARY
+    #         os.O_RANDOM
+    #         os.O_SEQUENTIAL
+    #         os.O_TEXT
+    #         os.O_ASYNC
+    #         os.O_DIRECT
+    #         os.O_DIRECTORY
+    #         os.O_NOFOLLOW
+    #         os.O_NOATIME
+    nmode = ''
+    if os.O_RDONLY & flags:
+      nmode = 'r'
+    elif os.O_WRONLY & flags:
+      nmode = 'w'
+    elif os.O_RDWR & flags:
+      # TODO: this makes it behave as if `os.O_TRUNC` had been specified,
+      #       but not checking for that... the reason to use 'w' instead
+      #       of 'r+' is simply that the current implementation of fso_open()
+      #       then won't throw a ENOENT error...
+      nmode = 'w'
+    else:
+      raise IOError(errno.EINVAL, 'Invalid argument', flags)
+    if os.O_APPEND & flags:
+      nmode += 'b'
+    fp = self.fso_open(path, nmode)
+    self.fds[id(fp)] = fp
+    return id(fp)
+
+  #----------------------------------------------------------------------------
+  def fso_os_fdopen(self, fd, mode):
+    if fd not in self.fds:
+      return self.originals['os:fdopen'](fd, mode)
+    # todo: ensure that modes are consistent?...
+    return self.fds[fd]
+
+  #----------------------------------------------------------------------------
+  def fso_os_read(self, fd, n):
+    if fd not in self.fds:
+      return self.originals['os:read'](fd, n)
+    return self.fds[fd].read(n)
+
+  #----------------------------------------------------------------------------
+  def fso_os_write(self, fd, str):
+    if fd not in self.fds:
+      return self.originals['os:write'](fd, str)
+    self.fds[fd].write(str)
+    return len(str)
+
+  #----------------------------------------------------------------------------
+  def fso_os_close(self, fd):
+    if fd not in self.fds:
+      return self.originals['os:close'](fd)
+    self.fds.pop(fd).close()
 
 #------------------------------------------------------------------------------
 # end of $Id$
