@@ -7,7 +7,7 @@ file I/O operations. It does this by creating a caching overlay over
 the local file system, allowing read-through access, but storing
 modifications in memory. These in-memory changes can be inspected, to
 validate unit tests, and when the test completes, all changes to the
-file system will be vaporized and blown out to see (to quote
+file system will be vaporized and blown out to sea (to quote
 Dr. Stanley Goodspeed:
 http://www.youtube.com/watch?v=K-uEbYq9kNU&t=6m29s).
 
@@ -128,7 +128,9 @@ Known Limitations
 * File permissions are currently NOT enforced (and might be overkill),
   and overlayed directories report mode 0700, and overlayed files
   and symlinks report mode 0600.
+
 * File open modes of 'U' and 'rU' are silently treated as 'r'.
+
 * The following `stat` attributes are not available/managed:
   * st_ino
   * st_dev
@@ -138,13 +140,16 @@ Known Limitations
   * st_atime
   * st_mtime
   * st_ctime
+
 * Since changes are explicitly stored in-memory, changes that exceed
   the local machine's memory will cause problems.
+
 * The following categories of filesystem entries will not work:
   * sockets
   * block special device files
   * character special device files
   * FIFOs (named pipes)
+
 
 Usage
 =====
