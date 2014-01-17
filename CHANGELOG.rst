@@ -3,6 +3,12 @@ ChangeLog
 =========
 
 
+v0.3
+====
+
+* Stubbed support for "bufsize" parameter to os.fdopen
+
+
 v0.2
 ====
 
