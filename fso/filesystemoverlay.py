@@ -684,9 +684,9 @@ class FileSystemOverlay(object):
     return id(fp)
 
   #----------------------------------------------------------------------------
-  def fso_os_fdopen(self, fd, mode):
+  def fso_os_fdopen(self, fd, mode=None, bufsize=None):
     if fd not in self.fds:
-      return self.originals['os:fdopen'](fd, mode)
+      return self.originals['os:fdopen'](fd, mode, bufsize)
     # todo: ensure that modes are consistent?...
     return self.fds[fd]
 
