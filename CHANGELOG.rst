@@ -3,6 +3,12 @@ ChangeLog
 =========
 
 
+v0.3.1
+======
+
+* Removed `distribute` dependency
+
+
 v0.3
 ====
 
@@ -12,7 +18,7 @@ v0.3
 v0.2
 ====
 
-* First git-tagged release
+* First tagged release
 * Added `passthru` option to exclude overlayed paths
 * Added preliminary support for file descriptor based access via:
   - os.open()
