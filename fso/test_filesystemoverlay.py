@@ -45,7 +45,7 @@ class TestFileSystemOverlay(unittest.TestCase):
       os.path.join('dir', 'file'),
       os.path.join('dir', 'subdir'),
       os.path.join('dir', 'subdir', 'file'),
-      ]
+    ]
     tdir = tempfile.mkdtemp(prefix='fso-test_filesystemoverlay-unittest.links.')
     for tfile in tfiles:
       self.assertFalse(os.path.exists(os.path.join(tdir, tfile)))
@@ -77,7 +77,7 @@ class TestFileSystemOverlay(unittest.TestCase):
         'add:' + os.path.join(tdir, 'flink'),
         'add:' + os.path.join(tdir, 'link'),
         'add:' + os.path.join(tdir, 'slink'),
-        ]
+      ]
       self.assertEqual(fso.changes, fso_changes)
       with FileSystemOverlay() as fso2:
         self.assertEqual(fso2.changes, [])
@@ -120,7 +120,7 @@ class TestFileSystemOverlay(unittest.TestCase):
       (os.path.join(tdir, 'a/b'), ['c'], []),
       (os.path.join(tdir, 'a/b/c'), ['d'], []),
       (os.path.join(tdir, 'a/b/c/d'), [], ['bar']),
-      ]
+    ]
     self.assertEqual(list(os.walk(tdir)), no_fso_walk)
     with FileSystemOverlay() as fso:
       self.assertEqual(list(os.walk(tdir)), no_fso_walk)
@@ -137,7 +137,7 @@ class TestFileSystemOverlay(unittest.TestCase):
           (os.path.join(tdir, 's'), ['t'], []),
           (os.path.join(tdir, 's/t'), ['u'], []),
           (os.path.join(tdir, 's/t/u'), [], []),
-          ])
+        ])
       os.mkdir(os.path.join(tdir, 's/t/u/v'))
       os.symlink('zog',os.path.join(tdir, 's/t/u/v/zig'))
       self.assertEqual(
@@ -149,7 +149,7 @@ class TestFileSystemOverlay(unittest.TestCase):
           (os.path.join(tdir, 's/t'), ['u'], []),
           (os.path.join(tdir, 's/t/u'), ['v'], []),
           (os.path.join(tdir, 's/t/u/v'), [], ['zig']),
-          ])
+        ])
       os.unlink(os.path.join(tdir, 's/t/u/v/zig'))
       os.rmdir(os.path.join(tdir, 's/t/u/v'))
       os.rmdir(os.path.join(tdir, 's/t/u'))
@@ -181,7 +181,7 @@ class TestFileSystemOverlay(unittest.TestCase):
       (os.path.join(tdir, 'a/b'), ['c'], []),
       (os.path.join(tdir, 'a/b/c'), ['d'], ['file']),
       (os.path.join(tdir, 'a/b/c/d'), [], ['bar']),
-      ]
+    ]
     self.assertEqual(list(os.walk(tdir)), no_fso_walk)
     with FileSystemOverlay() as fso:
       self.assertEqual(list(os.walk(tdir)), no_fso_walk)
@@ -190,13 +190,13 @@ class TestFileSystemOverlay(unittest.TestCase):
         (tdir, ['a'], []),
         (os.path.join(tdir, 'a'), ['b'], []),
         (os.path.join(tdir, 'a/b'), [], []),
-        ])
+      ])
       self.assertEqual(fso.changes, [
         'del:' + os.path.join(tdir, 'a/b/c'),
         'del:' + os.path.join(tdir, 'a/b/c/d'),
         'del:' + os.path.join(tdir, 'a/b/c/d/bar'),
         'del:' + os.path.join(tdir, 'a/b/c/file'),
-        ])
+      ])
     self.assertEqual(list(os.walk(tdir)), no_fso_walk)
     shutil.rmtree(os.path.join(tdir, 'a/b/c'))
     os.rmdir(os.path.join(tdir, 'a/b'))
@@ -447,7 +447,7 @@ class TestFileSystemOverlay(unittest.TestCase):
         'mod:' + os.path.join(tdir, 'a/b/file'),
         'add:' + os.path.join(tdir, 'a/b/no-such-file'),
         'mod:' + os.path.join(tdir, 'a/b/zig'),
-        ])
+      ])
       self.assertEqual(fso.getChanges(tdir), [
         'add:a/b/bling',
         'del:a/b/c',
@@ -456,19 +456,19 @@ class TestFileSystemOverlay(unittest.TestCase):
         'mod:a/b/file',
         'add:a/b/no-such-file',
         'mod:a/b/zig',
-        ])
+      ])
       self.assertEqual(fso.getChanges(os.path.join(tdir, 'a/b/c')), [
         'del:',
         'del:d',
         'del:d/bar',
-        ])
+      ])
     chk = [
       (tdir, ['a'], []),
       (os.path.join(tdir, 'a'), ['b'], []),
       (os.path.join(tdir, 'a/b'), ['c'], ['deadlink', 'file', 'link', 'zig']),
       (os.path.join(tdir, 'a/b/c'), ['d'], []),
       (os.path.join(tdir, 'a/b/c/d'), [], ['bar']),
-      ]
+    ]
     out = [(w[0], sorted(w[1]), sorted(w[2])) for w in os.walk(tdir)]
     self.assertEqual(out, chk)
     self.assertEqual(open(os.path.join(tdir, 'a/b/zig'), 'rb').read(), 'zog')
