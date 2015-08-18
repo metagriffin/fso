@@ -25,9 +25,15 @@
 #         stat.S_ISFIFO(mode)   == FIFO (named pipe)
 #         stat.S_ISSOCK(mode)   == socket
 
-import sys, os, six, asset, stat, collections
+import sys
+import os
+import stat
+import collections
 import errno
 import re
+
+import six
+import asset
 import morph
 
 #------------------------------------------------------------------------------

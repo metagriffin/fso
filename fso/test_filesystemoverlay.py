@@ -23,7 +23,13 @@
 # shutil.rmtree() when doing a `os.rmdir()` so that the presence of
 # any unexpected files will cause an exception.
 
-import sys, os, unittest, tempfile, stat, shutil, uuid
+import sys
+import os
+import unittest
+import tempfile
+import stat
+import shutil
+import uuid
 
 from .filesystemoverlay import FileSystemOverlay
 
