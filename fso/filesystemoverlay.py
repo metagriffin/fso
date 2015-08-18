@@ -141,7 +141,7 @@ class FileSystemOverlay(object):
     'os.path:lexists'   : 'fso_lexists',
     'os.path:islink'    : 'fso_islink',
     'shutil:rmtree'     : 'fso_rmtree',
-    }
+  }
 
   #----------------------------------------------------------------------------
   def __init__(self, install=False, passthru=None):
