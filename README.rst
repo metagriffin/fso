@@ -7,9 +7,9 @@ file I/O operations. It does this by creating a caching overlay over
 the local file system, allowing read-through access, but storing
 modifications in memory. These in-memory changes can be inspected, to
 validate unit tests, and when the test completes, all changes to the
-file system will be vaporized and blown out to sea (to quote
+file system will be "Vaporized. Blown out to sea." (to quote
 Dr. Stanley Goodspeed:
-http://www.youtube.com/watch?v=K-uEbYq9kNU&t=6m29s).
+http://memes.getyarn.io/yarn-clip/f633c7e6-b713-4a86-913f-21bf1b8200ed).
 
 
 Project
@@ -58,7 +58,7 @@ Use:
       # that all paths are absolutized, dereferenced, and normalized):
       self.assertEqual(self.fso.changes, [
         'add:/etc/foobar.conf',
-        ])
+      ])
 
 
 Overview
@@ -185,7 +185,7 @@ uninstalled before they need to report the errors. Example:
           'del:/etc/hosts',
           'add:/path/to/cwd/no-such-file',
           'add:/tmp/my-test-directory',
-          ])
+        ])
 
       self.assertFalse(os.path.exists('no-such-file'))
       self.assertFalse(os.path.exists('/etc/my-test-directory'))
