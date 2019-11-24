@@ -77,6 +77,18 @@ class TestApi(unittest.TestCase):
     self.assertFalse(os.path.exists(fname1))
     self.assertFalse(os.path.exists(fname2))
 
+  #----------------------------------------------------------------------------
+  def test_api_apply(self):
+    fname1 = tempfile.mktemp(prefix='fso-test_api-unittest.1.')
+    self.assertFalse(os.path.exists(fname1))
+    with api.push() as overlay:
+      self.assertFalse(os.path.exists(fname1))
+      overlay.apply({ fname1 : 'stuffs' })
+      self.assertTrue(os.path.exists(fname1))
+      with open(fname1, 'rb') as fp:
+        self.assertEqual(fp.read(), 'stuffs')
+    self.assertFalse(os.path.exists(fname1))
+
 
 #------------------------------------------------------------------------------
 # end of $Id$

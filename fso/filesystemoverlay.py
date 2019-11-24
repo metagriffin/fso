@@ -292,6 +292,22 @@ class FileSystemOverlay(object):
     raise NotImplementedError()
 
   #----------------------------------------------------------------------------
+  def apply(self, files):
+    '''
+    A quick & simple way to create a bunch of files, example::
+
+      with fso.push() as overlay:
+        overlay.apply({
+          '/path/to/file/one'     : 'some test content',
+          '/path/to/another/file' : 'other stuff',
+        })
+        # do stuff with the files...
+    '''
+    for name, content in files.items():
+      with open(name, 'wb') as fp:
+        fp.write(content)
+
+  #----------------------------------------------------------------------------
   def _addentry(self, entry):
     if entry.path in self.entries:
       entry.omode = self.entries[entry.path].omode
