@@ -3,6 +3,13 @@ ChangeLog
 =========
 
 
+v0.3.2
+======
+
+* Deprecated `FSO.getChanges` in favor of `FSO.get_changes`
+* Added `FSO.apply` helper method
+
+
 v0.3.1
 ======
 
