@@ -42,7 +42,8 @@ class UnknownOverlayMode(Exception): pass
 #------------------------------------------------------------------------------
 OverlayStat = collections.namedtuple('OverlayStat', [
   'st_mode', 'st_ino', 'st_dev', 'st_nlink', 'st_uid', 'st_gid',
-  'st_size', 'st_atime', 'st_mtime', 'st_ctime', 'st_overlay'])
+  'st_size', 'st_atime', 'st_mtime', 'st_ctime', 'st_overlay',
+])
 
 #------------------------------------------------------------------------------
 class ContextStringIO(six.StringIO):
@@ -51,6 +52,7 @@ class ContextStringIO(six.StringIO):
   def __exit__(self, exc_type, exc_val, exc_tb):
     self.close()
     return False
+
 
 #------------------------------------------------------------------------------
 class OverlayFileStream(ContextStringIO):
@@ -64,6 +66,7 @@ class OverlayFileStream(ContextStringIO):
     self.fso._addentry(OverlayEntry(
       self.fso, self.path, stat.S_IFREG, self.prepend + self.getvalue()))
     ContextStringIO.close(self)
+
 
 #------------------------------------------------------------------------------
 class OverlayEntry(object):
@@ -106,6 +109,7 @@ class OverlayEntry(object):
   def __repr__(self):
     return '<OverlayEntry %s mode=%r, omode=%r, content-length=%d>' % (
       self.path, self.mode, self.omode, len(self.content or ''))
+
 
 #------------------------------------------------------------------------------
 class FileSystemOverlay(object):
@@ -247,10 +251,22 @@ class FileSystemOverlay(object):
   #----------------------------------------------------------------------------
   @property
   def changes(self):
-    return [self.entries[path].change for path in sorted(self.entries.keys())]
+    return [ self.entries[path].change for path in sorted(self.entries.keys()) ]
 
   #----------------------------------------------------------------------------
-  def getChanges(self, root=None, recurse=True, relative=True):
+  def getChanges(self, *args, **kws):
+    '''
+    @DEPRECATED(0.3.2)
+    '''
+    import warnings
+    warnings.warn('`getChanges` is deprecated; use `get_changes`', FutureWarning)
+    return self.get_changes(*args, **kws)
+
+  #----------------------------------------------------------------------------
+  def get_changes(self, root=None, recurse=True, relative=True):
+    '''
+    Filters and adjusts the entries in `.changes`.
+    '''
     if root is None:
       return self.changes
     root = self.abs(root)
@@ -715,6 +731,8 @@ class FileSystemOverlay(object):
       return self.originals['os:close'](fd)
     self.fds.pop(fd).close()
 
+
 #------------------------------------------------------------------------------
 # end of $Id$
+# $ChangeLog$
 #------------------------------------------------------------------------------
